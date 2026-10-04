@@ -15,8 +15,10 @@ command:
   - $DATABRICKS_APP_PORT
 
 env:
+  # Workspace dbc-61e43fe7-4c59 (migrado el 2026-10-04: el Free Edition agoto su computo).
+  # rag_v1_idx: indice por trozos sobre documents_curated; el texto sale del propio indice.
   - name: VS_INDEX
-    value: workspace.lab.rag_v0_idx      # cambiar a rag_v1_idx cuando este ready
+    value: workspace.lab.rag_v1_idx
   - name: QUERIES_LOG
     value: "1"
   - name: RESEARCH_RECORD
@@ -28,4 +30,4 @@ env:
   # (12912d7d-...) tenga CAN_USE sobre pivot-gateway; si no, el visor recibe un
   # evento error en cada pregunta live.
   - name: PIVOT_GATEWAY_URL
-    value: "https://pivot-gateway-7474652340191726.aws.databricksapps.com"
+    value: "https://pivot-gateway-7474660394752821.aws.databricksapps.com"

@@ -80,7 +80,7 @@ uv sync
 cp .env.example .env
 
 brew tap databricks/tap && brew install databricks
-databricks auth login --host https://dbc-19f58290-50fb.cloud.databricks.com --profile hack
+databricks auth login --host https://dbc-61e43fe7-4c59.cloud.databricks.com --profile hack
 databricks current-user me --profile hack
 
 uv run python -c "from data_pipeline.databricks_io import Databricks; print(Databricks().sql('SHOW TABLES IN workspace.lab'))"
@@ -90,7 +90,7 @@ Omnigent (gestionado en el workspace):
 
 ```bash
 uv tool install "omnigent[databricks]"
-omnigent login dbc-19f58290-50fb.cloud.databricks.com/omnigent
+omnigent login dbc-61e43fe7-4c59.cloud.databricks.com/omnigent
 ```
 
 ---

@@ -5,7 +5,7 @@ exploration, follows its SSE and yields bridge contract events. No bridge endpoi
 viewer code changes.
 
 Env on the bridge app:
-  PIVOT_GATEWAY_URL   e.g. https://pivot-gateway-7474652340191726.aws.databricksapps.com
+  PIVOT_GATEWAY_URL   e.g. https://pivot-gateway-7474660394752821.aws.databricksapps.com
   Databricks Apps injects DATABRICKS_HOST / DATABRICKS_CLIENT_ID / DATABRICKS_CLIENT_SECRET
   (the bridge app's service principal, which needs CAN_USE on the Gateway app).
   PIVOT_GATEWAY_DEV_TOKEN  local development only.
