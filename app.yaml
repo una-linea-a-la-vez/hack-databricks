@@ -23,3 +23,8 @@ env:
     value: "1"
   - name: VS_KEEPWARM
     value: "1"
+  # El orquestador real (agent_lab/runtime.py -> pivot-gateway). Sin esta variable
+  # `mode: live` sigue cayendo al simulador y lo anuncia. Descomentar cuando
+  # pivot-gateway este desplegada y el SP de esta app tenga CAN_USE sobre ella.
+  # - name: PIVOT_GATEWAY_URL
+  #   value: "https://pivot-gateway-7474652340191726.aws.databricksapps.com"
