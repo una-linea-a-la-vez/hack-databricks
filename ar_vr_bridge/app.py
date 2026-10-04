@@ -48,7 +48,8 @@ async def index() -> FileResponse:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "schema_version": SCHEMA_VERSION}
+    # retrieval: "vectorial" (AI Search) o "lexico" (BM25 de respaldo, ar_vr_bridge/lexico.py).
+    return {"status": "ok", "schema_version": SCHEMA_VERSION, "retrieval": retrieval.ultimo_modo}
 
 
 @app.on_event("startup")
@@ -62,6 +63,11 @@ async def _startup() -> None:
     if os.environ.get("VS_KEEPWARM", "1") == "1":
         app.state.keepwarm = asyncio.create_task(retrieval.keep_warm())
     app.state.aprobados = asyncio.create_task(asyncio.to_thread(retrieval.aprobados))
+    # El respaldo léxico tarda ~48 s en construirse (14 000 trozos). Se construye aquí para que,
+    # si el índice vectorial no responde, la primera pregunta no sea la que lo pague.
+    if os.environ.get("LEXICO_PRECARGA", "1") == "1":
+        from ar_vr_bridge import lexico
+        app.state.lexico = asyncio.create_task(asyncio.to_thread(lexico.indice, retrieval._sql))
 
 
 @app.post("/api/v1/ask", response_model=AskResponse)

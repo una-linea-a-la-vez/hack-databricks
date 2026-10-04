@@ -180,6 +180,36 @@ def _snippets(doc_ids: list[str], query: str) -> dict[str, str]:
     return {d: t for d, (_, t) in mejor.items()}
 
 
+# ---------------------------------------------------------------------------
+# Respaldo léxico (ar_vr_bridge/lexico.py). Si el índice vectorial falla, se busca con BM25 en
+# el mismo corpus curado; el fallo se recuerda VS_REINTENTO_S para no pagar un timeout por
+# pregunta, y pasado ese tiempo se vuelve a probar el índice. RETRIEVAL_MODE=lexico lo fuerza.
+# ---------------------------------------------------------------------------
+
+VS_REINTENTO_S = int(os.environ.get("VS_REINTENTO_S", "60"))
+_vectorial_caido_hasta: float = 0.0
+ultimo_modo: str = "vectorial"   # lo que respondió la última búsqueda, para /health
+
+
+def _vectorial_disponible() -> bool:
+    if os.environ.get("RETRIEVAL_MODE", "").lower() == "lexico":
+        return False
+    return time.time() >= _vectorial_caido_hasta
+
+
+def _marcar_vectorial_caido(exc: Exception) -> None:
+    global _vectorial_caido_hasta
+    _vectorial_caido_hasta = time.time() + VS_REINTENTO_S
+    print(f"[retrieval] índice vectorial no disponible, uso BM25 {VS_REINTENTO_S}s: {exc}"[:300], flush=True)
+
+
+def _buscar_lexico(query: str, n: int) -> list[dict]:
+    global ultimo_modo
+    from ar_vr_bridge import lexico
+    ultimo_modo = "lexico"
+    return lexico.buscar(query, n, _sql)
+
+
 def search(query: str, num_results: int = 5,
            con_snippet: bool = False) -> tuple[list[Citation], bool, int]:
     """Devuelve (citas, hay_evidencia, latencia_ms). Solo cita lo curado y aprobado.
@@ -191,17 +221,33 @@ def search(query: str, num_results: int = 5,
     en el camino de voz, que tiene 1,5 s. Por eso esta apagado por defecto.
     """
     started = time.perf_counter()
-    por_trozos = indice_por_trozos()
+    filas_lexicas = None if _vectorial_disponible() else _buscar_lexico(query, num_results * 4)
+    if filas_lexicas is None:
+        try:
+            por_trozos = indice_por_trozos()
+            filas = _query_con_texto(query, num_results * 4) if por_trozos else None
+            rows_vectoriales = None if por_trozos else _query(query, num_results * 4)
+        except Exception as exc:
+            _marcar_vectorial_caido(exc)
+            filas_lexicas = _buscar_lexico(query, num_results * 4)
+
+    global ultimo_modo
+    if filas_lexicas is not None:
+        # Mismo corpus curado, otra forma de buscar: el texto del trozo viene con la fila.
+        por_trozos = True
+        filas = filas_lexicas
+        rows_vectoriales = None
+    else:
+        ultimo_modo = "vectorial"
 
     if por_trozos:
         # El indice ya es de trozos curados: el texto que devuelve ES el pasaje que
         # casó, y viene en la misma llamada. Sin SQL extra y sin aproximar nada.
-        filas = _query_con_texto(query, num_results * 4)
         textos_por_chunk = {f.get("chunk_id"): (f.get("text") or "") for f in filas}
         rows = [[f.get(c) for c in COLUMNS] + [f.get("score", 0.0)] for f in filas]
     else:
         textos_por_chunk = {}
-        rows = _query(query, num_results * 4)
+        rows = rows_vectoriales
 
     citations = _to_citations(rows, num_results * 2, textos_por_chunk)
 
