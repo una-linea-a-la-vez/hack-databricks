@@ -75,7 +75,7 @@ Zenodo        ─┘                     │                          índice AI
 ## Arranque rápido
 
 ```bash
-git clone git@github.com:joseraulsoriano/hack-databricks.git && cd hack-databricks
+git clone git@github.com:una-linea-a-la-vez/hack-databricks.git && cd hack-databricks
 uv sync
 cp .env.example .env
 
