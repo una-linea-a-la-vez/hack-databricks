@@ -33,6 +33,7 @@ transporte; aquel, la forma de los datos.
 | `POST` | `/api/v1/hypothesis` | **Puerta de entrada.** Admite o rechaza una hipótesis por su procedencia | ✅ |
 | `POST` | `/api/v1/ask` | **Camino rápido para la voz.** Solo RAG, < 1,5 s | ✅ |
 | `GET` | `/api/v1/queries` | Las preguntas recibidas y su resultado | ✅ |
+| `GET` | `/api/v1/lineage` | **El linaje y sus bifurcaciones**, listo para el visor | ✅ |
 | `POST` | `/api/v1/evidence` | **Pasajes curados para construir una hipótesis** | ✅ |
 | `GET` | `/api/v1/documents/{doc_id}` | El documento curado entero, por secciones | ✅ |
 
@@ -406,3 +407,41 @@ escribe en `queries`: no es una pregunta del laboratorio.
 Todos los trozos curados de un documento, con sus secciones. **No hay PDF en el corpus**; esto
 es el texto que sí hay (707 documentos traen texto completo). Sirve para que una persona lo lea
 completo en vez de fiarse de un fragmento. `404` si el documento no está curado.
+
+
+---
+
+## `GET /api/v1/lineage` — el caso de uso de las bifurcaciones
+
+Devuelve un `ExploreResponse` —**el mismo que el visor ya consume**, sin tocar su código— con
+la cadena de descubrimientos de las PET hidrolasas y los caminos que nadie tomó.
+
+```bash
+curl -s "$BASE/api/v1/lineage" -H "Authorization: Bearer $TOKEN"
+```
+
+Dos capas, separadas por la altura del grafo:
+
+| Capa | `type` | `layer` | `agent_generated` | Qué es |
+|---|---|---|---|---|
+| **Tronco histórico** | `evidence` | 1 | `false` | Lo que ocurrió. Cada nodo cita un `doc_id` curado y trae su pasaje |
+| **Ramas contrafactuales** | `hypothesis` | 3 | **`true`** | Lo que se pudo intentar. El visor las dibuja con borde discontinuo y **las manda a revisión humana** |
+
+Esa separación no es estética: `gate/bridge.py` sólo somete a revisión los nodos
+`agent_generated`. Lo documentado no se revisa; lo propuesto, sí.
+
+**El tronco** (5 hitos, todos citados): Yoshida 2016 (`europepmc:26965627`) → Austin 2018
+(`europepmc:29666242`) → Knott 2020 (`europepmc:32989159`) → Tournier 2020
+(`europepmc:32269349`) → Lu 2022 (`europepmc:35478237`).
+
+**Las ramas** (3, todas con `comprobable_con` contra `pet_activity_ml`): optimizar
+termoestabilidad en vez de actividad en 2018; una sola enzima en vez del cóctel en 2020;
+entrenar el modelo sobre actividad en vez de estabilidad en 2022.
+
+Un hito sin documento curado **no se dibuja**: no se pinta lo que no se puede citar.
+
+> **Precisión de encuadre.** El Nobel de esta historia es el de **Frances Arnold (2018,
+> evolución dirigida)**, la técnica que habilita toda la cadena. El trabajo sobre PETasa no
+> tiene Nobel: tiene el premio Biocat de Alain Marty y galardones del DOE al consorcio BOTTLE.
+> Y tres de los cinco papers son de acceso cerrado (Science, Nature): de ellos sólo se cita el
+> resumen público, y así consta en su `license`.

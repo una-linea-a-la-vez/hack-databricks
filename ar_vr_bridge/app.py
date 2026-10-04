@@ -23,7 +23,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from ar_vr_bridge import aprobacion, consultas, evidencia, mock, redaccion, registro, retrieval
+from ar_vr_bridge import (aprobacion, consultas, evidencia, grafo_linaje, mock, redaccion,
+                          registro, retrieval)
 from ar_vr_bridge.contract import (
     SCHEMA_VERSION, Answer, AskRequest, AskResponse, Check, ExploreRequest, ExploreResponse,
     DocumentResponse, EvidenceRequest, EvidenceResponse, HypothesisReceipt,
@@ -96,6 +97,41 @@ async def ask(request: AskRequest) -> AskResponse:
                     citation_doc_ids=[c.doc_id for c in citations])
     return AskResponse(query_id=query_id, answer=answer, citations=citations,
                        has_evidence=has_evidence, tts_text=tts_text, latency_ms=latency_ms)
+
+
+@app.get("/api/v1/lineage", response_model=ExploreResponse)
+async def linaje_endpoint() -> ExploreResponse:
+    """El linaje de las PET hidrolasas y sus bifurcaciones, listo para el visor.
+
+    Devuelve un `ExploreResponse` —el mismo que ya consume el visor— con dos capas:
+    el tronco histórico citado (`agent_generated: false`, capa de evidencia) y las
+    ramas contrafactuales (`agent_generated: true`, capa de hipótesis), que el visor
+    dibuja con borde discontinuo y manda a revisión humana.
+
+    Caso de uso: enseñar que la cadena Yoshida 2016 → Austin 2018 → Knott/Tournier
+    2020 → FAST-PETase 2022 **tuvo bifurcaciones**, y que en cada nodo el
+    investigador pudo haber tomado otro camino.
+    """
+    inicio = time.monotonic()
+    try:
+        nodes, edges, citations = await asyncio.to_thread(grafo_linaje.construir)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"corpus no disponible: {exc}")
+
+    historicos = sum(1 for n in nodes if not n.agent_generated)
+    generados = len(nodes) - historicos
+    return ExploreResponse(
+        query_id="lineage", status="ok", nodes=nodes, edges=edges, citations=citations,
+        answer=Answer(
+            headline="El linaje de las PET hidrolasas tuvo bifurcaciones en cada hito",
+            conclusion=f"{historicos} hitos documentados y citados, con {generados} caminos "
+                       f"alternativos que el laboratorio propone y que nadie tomó.",
+            justification="Los nodos históricos citan un documento curado del corpus. Los "
+                          "alternativos están marcados como generados por un agente y no "
+                          "verificados: son hipótesis comprobables, no historia.",
+            tts_text="La cadena de descubrimientos de las PET hidrolasas tuvo bifurcaciones. "
+                     "Estas son las que nadie tomó."),
+        latency_ms=int((time.monotonic() - inicio) * 1000))
 
 
 @app.post("/api/v1/evidence", response_model=EvidenceResponse)
